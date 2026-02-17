@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MiniRetail Frontend</title>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    h2 { margin-top: 2em; }
+    form { margin-bottom: 1em; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+    th, td { border: 1px solid #ccc; padding: 0.5em; }
+    button { margin: 0 0.2em; }
+  </style>
+</head>
+<body>
+  <h1>MiniRetail Store</h1>
+
+  <h2>Add Product</h2>
+  <form id="addProductForm">
+    <input type="text" id="productName" placeholder="Name" required>
+    <input type="number" id="productPrice" placeholder="Price" required min="0">
+    <input type="number" id="productStock" placeholder="Stock" required min="0">
+    <button type="submit">Add Product</button>
+  </form>
+
+  <h2>Products</h2>
+  <table id="productsTable">
+    <thead>
+      <tr><th>ID</th><th>Name</th><th>Price</th><th>Stock</th><th>Actions</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>Add to Cart</h2>
+  <form id="addToCartForm">
+    <input type="number" id="cartProductId" placeholder="Product ID" required min="1">
+    <input type="number" id="cartQty" placeholder="Quantity" required min="1">
+    <button type="submit">Add to Cart</button>
+  </form>
+
+  <h2>Cart</h2>
+  <table id="cartTable">
+    <thead>
+      <tr><th>Product ID</th><th>Name</th><th>Qty</th><th>Price</th><th>Subtotal</th><th>Actions</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div id="cartTotal"></div>
+
+  <script>
+    const apiBase = '/api';
+
+    async function fetchProducts() {
+      const res = await fetch(`${apiBase}/products`);
+      return res.ok ? res.json() : [];
+    }
+
+    async function addProduct(name, price, stock) {
+      await fetch(`${apiBase}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, price, stock })
+      });
+      loadProducts();
+    }
+
+    async function editProduct(id, name, price, stock) {
+      await fetch(`${apiBase}/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, price, stock })
+      });
+      loadProducts();
+    }
+
+    async function deleteProduct(id) {
+      await fetch(`${apiBase}/products/${id}`, { method: 'DELETE' });
+      loadProducts();
+    }
+
+    async function fetchCart() {
+      const res = await fetch(`${apiBase}/cart`);
+      return res.ok ? res.json() : [];
+    }
+
+    async function addToCart(product_id, qty) {
+      await fetch(`${apiBase}/cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id, qty })
+      });
+      loadCart();
+    }
+
+    async function removeCartItem(product_id) {
+      await fetch(`${apiBase}/cart/${product_id}`, { method: 'DELETE' });
+      loadCart();
+    }
+
+    // UI rendering
+    async function loadProducts() {
+      const products = await fetchProducts();
+      const tbody = document.querySelector('#productsTable tbody');
+      tbody.innerHTML = '';
+      products.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.id}</td>
+          <td><input value="${p.name}" data-id="${p.id}" data-field="name"></td>
+          <td><input type="number" value="${p.price}" data-id="${p.id}" data-field="price"></td>
+          <td><input type="number" value="${p.stock}" data-id="${p.id}" data-field="stock"></td>
+          <td>
+            <button onclick="editProductUI(${p.id})">Edit</button>
+            <button onclick="deleteProduct(${p.id})">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.editProductUI = function(id) {
+      const name = document.querySelector(`input[data-id='${id}'][data-field='name']`).value;
+      const price = document.querySelector(`input[data-id='${id}'][data-field='price']`).value;
+      const stock = document.querySelector(`input[data-id='${id}'][data-field='stock']`).value;
+      editProduct(id, name, Number(price), Number(stock));
+    };
+
+    async function loadCart() {
+      const cart = await fetchCart();
+      const tbody = document.querySelector('#cartTable tbody');
+      tbody.innerHTML = '';
+      let total = 0;
+      cart.forEach(item => {
+        const subtotal = item.price * item.qty;
+        total += subtotal;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.product_id}</td>
+          <td>${item.name}</td>
+          <td>${item.qty}</td>
+          <td>${item.price}</td>
+          <td>${subtotal}</td>
+          <td><button onclick="removeCartItem(${item.product_id})">Remove</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('cartTotal').textContent = `Total: ${total}`;
+    }
+
+    // Form handlers
+    document.getElementById('addProductForm').onsubmit = e => {
+      e.preventDefault();
+      const name = document.getElementById('productName').value;
+      const price = Number(document.getElementById('productPrice').value);
+      const stock = Number(document.getElementById('productStock').value);
+      addProduct(name, price, stock);
+      e.target.reset();
+    };
+
+    document.getElementById('addToCartForm').onsubmit = e => {
+      e.preventDefault();
+      const product_id = Number(document.getElementById('cartProductId').value);
+      const qty = Number(document.getElementById('cartQty').value);
+      addToCart(product_id, qty);
+      e.target.reset();
+    };
+
+    // Initial load
+    loadProducts();
+    loadCart();
+  </script>
+</body>
+</html>
